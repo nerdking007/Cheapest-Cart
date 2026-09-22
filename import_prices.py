@@ -43,10 +43,12 @@ def import_prices(csv_path=CSV_PATH):
     conn = get_connection()
     cur = conn.cursor()
 
-    # prices.csv is the single source of truth — wipe existing prices first
-    # so a cell you've since left blank actually clears that price, instead
-    # of an old value silently lingering from a previous import.
+    # prices.csv is the single source of truth — wipe existing prices AND
+    # items first, so a row you've since deleted from the CSV actually
+    # disappears from the app, instead of lingering forever as a "ghost"
+    # item that still shows up in search with no current price on it.
     cur.execute("DELETE FROM prices")
+    cur.execute("DELETE FROM items")
 
     with open(csv_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.reader(f)
