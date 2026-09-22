@@ -284,12 +284,11 @@ def index():
 
     elif action == "add":
         raw_text = request.form.get("items", "")
-        typed_items = [
-            line.strip()
-            for chunk in raw_text.split(",")
-            for line in chunk.split("\n")
-            if line.strip()
-        ]
+        # One item per LINE, not comma-separated — a lot of item names use
+        # a comma as part of the name itself (e.g. "Milk, Whole (Gallon)",
+        # "Tomatoes, Beefsteak"), so splitting on commas would chop a single
+        # item name into two bogus fragments. Newlines are unambiguous.
+        typed_items = [line.strip() for line in raw_text.split("\n") if line.strip()]
 
         for typed in typed_items:
             result = find_matching_item(typed, all_items, family_members)
