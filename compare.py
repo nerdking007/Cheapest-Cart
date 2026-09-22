@@ -163,10 +163,13 @@ def cheapest_per_item(item_names):
                 if best_info is None or info["unit_price"] < best_info["unit_price"]:
                     best_info = info
                     best_store = store_name
-        best_per_item[item] = {
-            "store": best_store,
-            "price": best_info["price"] if best_info else None,
-        }
+        if best_info:
+            best_per_item[item] = {**best_info, "store": best_store}
+        else:
+            best_per_item[item] = {
+                "store": None, "price": None, "quantity": None,
+                "unit_type": None, "unit_price": None,
+            }
 
     total = round(sum(
         v["price"] for v in best_per_item.values() if v["price"] is not None
@@ -235,7 +238,7 @@ def optimized_shopping_plan(item_names, user_lat=None, user_lon=None,
                 if info is not None and (best_info is None or info["unit_price"] < best_info["unit_price"]):
                     best_store, best_info = store, info
             if best_store:
-                assignment[item] = {"store": best_store, "price": best_info["price"]}
+                assignment[item] = {**best_info, "store": best_store}
             else:
                 dropped.append(item)
         return assignment, dropped
