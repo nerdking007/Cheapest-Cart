@@ -1,0 +1,18 @@
+# Database -- rebuilt fresh from prices.csv on every run/deploy
+grocery.db
+
+# Credentials -- never commit these
+.env
+*.env
+1788813224984_Kroger_details.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor/OS junk
+.vscode/
+.DS_Store
+Thumbs.db
