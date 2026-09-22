@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cheapest Cart</title>
+    <style>
+        :root {
+            --paper: #faf7f0;
+            --ink: #2b2620;
+            --ink-soft: #6b6255;
+            --line: #d8d0c0;
+            --accent: #2f6f4f;
+            --accent-soft: #e8f0ea;
+            --warn: #a84a32;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: #e9e4d8;
+            color: var(--ink);
+            font-family: "Courier New", Courier, monospace;
+            display: flex;
+            justify-content: center;
+            padding: 40px 16px;
+        }
+
+        .receipt {
+            background: var(--paper);
+            width: 100%;
+            max-width: 480px;
+            padding: 32px 28px 40px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            position: relative;
+        }
+
+        .receipt::before, .receipt::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0;
+            height: 10px;
+            background:
+                linear-gradient(135deg, var(--paper) 50%, transparent 50%) 0 0,
+                linear-gradient(45deg, var(--paper) 50%, transparent 50%) 0 0;
+            background-size: 14px 14px;
+            background-repeat: repeat-x;
+        }
+        .receipt::before { top: -9px; }
+        .receipt::after { bottom: -9px; transform: rotate(180deg); }
+
+        h1 {
+            font-size: 1.4rem;
+            text-align: center;
+            margin: 0 0 4px;
+            letter-spacing: 0.02em;
+        }
+
+        .tagline {
+            text-align: center;
+            color: var(--ink-soft);
+            font-size: 0.8rem;
+            margin: 0 0 24px;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px dashed var(--line);
+            margin: 20px 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            color: var(--ink-soft);
+        }
+
+        textarea {
+            width: 100%;
+            font-family: inherit;
+            font-size: 0.95rem;
+            padding: 10px;
+            border: 1px solid var(--line);
+            background: white;
+            color: var(--ink);
+            resize: vertical;
+            min-height: 90px;
+        }
+
+        .available {
+            font-size: 0.75rem;
+            color: var(--ink-soft);
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--ink);
+            color: var(--paper);
+            border: none;
+            font-family: inherit;
+            font-size: 0.9rem;
+            letter-spacing: 0.03em;
+            cursor: pointer;
+        }
+        button:hover { background: var(--accent); }
+
+        .warning {
+            background: #f6e9e3;
+            color: var(--warn);
+            border-left: 3px solid var(--warn);
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            margin-top: 10px;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            text-transform: none;
+            color: var(--ink-soft);
+            margin: 0 0 10px;
+        }
+
+        .store-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 0.9rem;
+            border-bottom: 1px dotted var(--line);
+        }
+
+        .store-row:first-child {
+            background: var(--accent-soft);
+            margin: 0 -8px 4px;
+            padding: 8px;
+            border-bottom: none;
+            border-radius: 2px;
+        }
+
+        .store-row:first-child .store-name::after {
+            content: " — best total";
+            font-size: 0.7rem;
+            color: var(--accent);
+        }
+
+        .missing-note {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--warn);
+            margin-top: 2px;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.88rem;
+        }
+
+        .item-store {
+            color: var(--ink-soft);
+        }
+
+        .split-total {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.95rem;
+        }
+
+        .visits-note {
+            font-size: 0.75rem;
+            color: var(--ink-soft);
+            margin-top: 4px;
+        }
+
+        .empty {
+            color: var(--ink-soft);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 12px 0;
+        }
+
+        .guess-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            font-size: 0.85rem;
+            border-bottom: 1px dotted var(--line);
+        }
+
+        .guess-buttons {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .guess-buttons form {
+            margin: 0;
+        }
+
+        .guess-buttons button {
+            width: auto;
+            margin: 0;
+            padding: 4px 10px;
+            font-size: 0.9rem;
+            line-height: 1;
+        }
+
+        .btn-yes {
+            background: var(--accent);
+            color: white;
+        }
+        .btn-yes:hover {
+            background: #24583e;
+        }
+
+        .btn-no {
+            background: var(--warn);
+            color: white;
+        }
+        .btn-no:hover {
+            background: #863a26;
+        }
+
+        .clear-form {
+            margin-top: 10px;
+        }
+
+        .btn-clear {
+            background: transparent;
+            color: var(--warn);
+            border: 1px solid var(--warn);
+        }
+        .btn-clear:hover {
+            background: var(--warn);
+            color: white;
+        }
+
+        #quick-search {
+            width: 100%;
+            font-family: inherit;
+            font-size: 0.95rem;
+            padding: 10px;
+            border: 1px solid var(--line);
+            background: white;
+            color: var(--ink);
+        }
+
+        .quick-results {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--line);
+            border-top: none;
+            background: white;
+            margin-bottom: 4px;
+        }
+
+        .quick-result-item {
+            padding: 7px 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-bottom: 1px dotted var(--line);
+        }
+        .quick-result-item:last-child {
+            border-bottom: none;
+        }
+        .quick-result-item:hover,
+        .quick-result-item.highlighted {
+            background: var(--accent-soft);
+        }
+
+        .default-badge {
+            float: right;
+            font-size: 0.65rem;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 3px;
+            padding: 1px 5px;
+        }
+
+        .quick-result-empty {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            color: var(--ink-soft);
+            font-style: italic;
+        }
+
+        .location-status {
+            text-align: center;
+            font-size: 0.72rem;
+            color: var(--ink-soft);
+            margin: -10px 0 20px;
+        }
+
+        .distance-tag {
+            font-size: 0.75rem;
+            color: var(--ink-soft);
+            font-weight: normal;
+        }
+
+        .unit-price-tag {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--ink-soft);
+            font-weight: normal;
+        }
+
+        .toggle-row {
+            display: flex;
+            gap: 8px;
+        }
+        .toggle-row form {
+            flex: 1;
+            margin: 0;
+        }
+        .btn-toggle {
+            width: 100%;
+            margin-top: 0;
+            background: transparent;
+            color: var(--ink);
+            border: 1px solid var(--ink);
+            font-size: 0.78rem;
+            padding: 9px 6px;
+        }
+        .btn-toggle:hover {
+            background: var(--ink);
+            color: var(--paper);
+        }
+
+        .mode-toggle-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .btn-mode {
+            flex: 1;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 0.82rem;
+            background: white;
+            color: var(--ink-soft);
+            border: 1px solid var(--line);
+            cursor: pointer;
+        }
+        .btn-mode.active {
+            background: var(--ink);
+            color: var(--paper);
+            border-color: var(--ink);
+        }
+
+        .filters-summary {
+            font-size: 0.7rem;
+            color: var(--ink-soft);
+            text-align: center;
+            margin: 10px 0 0;
+        }
+
+        .cart-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .cart-actions form {
+            margin: 0;
+        }
+
+        .btn-buy-all {
+            background: var(--accent);
+        }
+        .btn-buy-all:hover {
+            background: #24583e;
+        }
+
+        .cart-item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            padding: 8px 0;
+            border-bottom: 1px dotted var(--line);
+            flex-wrap: wrap;
+        }
+
+        .cart-item-name {
+            font-size: 0.88rem;
+            flex: 1 1 100%;
+            margin-bottom: 4px;
+        }
+
+        .cart-item-form {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+        }
+
+        .store-select {
+            font-family: inherit;
+            font-size: 0.78rem;
+            padding: 4px;
+            border: 1px solid var(--line);
+            background: white;
+            color: var(--ink);
+            max-width: 160px;
+        }
+
+        .btn-bought, .btn-remove {
+            width: auto;
+            margin: 0;
+            padding: 5px 10px;
+            font-size: 0.78rem;
+        }
+
+        .btn-bought {
+            background: var(--accent);
+        }
+        .btn-bought:hover {
+            background: #24583e;
+        }
+
+        .btn-remove {
+            background: transparent;
+            color: var(--warn);
+            border: 1px solid var(--warn);
+        }
+        .btn-remove:hover {
+            background: var(--warn);
+            color: white;
+        }
+
+        .not-carried {
+            font-size: 0.75rem;
+            color: var(--ink-soft);
+            font-style: italic;
+        }
+
+        .history-row {
+            display: flex;
+            flex-direction: column;
+            padding: 8px 0;
+            border-bottom: 1px dotted var(--line);
+            font-size: 0.85rem;
+        }
+
+        .history-item {
+            font-weight: bold;
+        }
+
+        .history-details {
+            color: var(--ink-soft);
+            font-size: 0.8rem;
+        }
+
+        .history-timestamp {
+            color: var(--ink-soft);
+            font-size: 0.7rem;
+            margin-top: 2px;
+        }
+
+        .plan-stop-row {
+            padding: 6px 0;
+            font-size: 0.85rem;
+            border-bottom: 1px dotted var(--line);
+        }
+
+        .plan-necessity-note {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--warn);
+            margin-top: 2px;
+        }
+
+        .filter-field {
+            margin-bottom: 16px;
+        }
+
+        .filter-field label {
+            margin-bottom: 4px;
+        }
+
+        .filter-field input {
+            width: 100%;
+            font-family: inherit;
+            font-size: 0.95rem;
+            padding: 8px;
+            border: 1px solid var(--line);
+            background: white;
+            color: var(--ink);
+        }
+
+        .filter-hint {
+            font-size: 0.72rem;
+            color: var(--ink-soft);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <h1>Cheapest Cart</h1>
+        <p class="tagline">tell it your list, it tells you where to buy</p>
+        <p id="location-status" class="location-status">📍 Finding your location…</p>
+
+        <div class="toggle-row">
+            <form method="POST">
+                <input type="hidden" name="action" value="{{ 'show_cart' if view == 'history' else 'show_history' }}">
+                <input type="hidden" name="cart" value="{{ cart_field }}">
+                <input type="hidden" name="pending" value="{{ pending_field }}">
+                <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                <input type="hidden" name="filters" value="{{ filters_field }}">
+                <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+                <button type="submit" class="btn-toggle">
+                    {% if view == "history" %}← Back to list{% else %}🛒 History ({{ purchased | length }}){% endif %}
+                </button>
+            </form>
+            <form method="POST">
+                <input type="hidden" name="action" value="{{ 'show_cart' if view == 'filters' else 'show_filters' }}">
+                <input type="hidden" name="cart" value="{{ cart_field }}">
+                <input type="hidden" name="pending" value="{{ pending_field }}">
+                <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                <input type="hidden" name="filters" value="{{ filters_field }}">
+                <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+                <button type="submit" class="btn-toggle">
+                    {% if view == "filters" %}← Back to list{% else %}⚙ Filters{% endif %}
+                </button>
+            </form>
+        </div>
+
+        {% if view == "cart" and grocery_list %}
+            <p class="filters-summary">
+                Filters: max {{ filters.max_distance if filters.max_distance is not none else "∞" }} mi ·
+                min ${{ "%.0f"|format(filters.min_spend) }}/store ·
+                min {{ filters.min_items }} items/store
+            </p>
+        {% endif %}
+
+        <hr class="divider">
+
+        {% if view == "cart" %}
+
+        <div class="mode-toggle-row">
+            <button type="button" id="mode-search-btn" class="btn-mode active">🔍 Search</button>
+            <button type="button" id="mode-paste-btn" class="btn-mode">📋 Paste a list</button>
+        </div>
+
+        <div id="search-section">
+            <label for="quick-search">Search &amp; add an item</label>
+            <input type="text" id="quick-search" placeholder="type to filter, e.g. 'mi'" autocomplete="off">
+            <div id="quick-results" class="quick-results"></div>
+
+            <form id="quick-add-form" method="POST">
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="cart" value="{{ cart_field }}">
+                <input type="hidden" name="pending" value="{{ pending_field }}">
+                <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                <input type="hidden" name="filters" value="{{ filters_field }}">
+                <input type="hidden" name="items" id="quick-add-items">
+                <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+            </form>
+        </div>
+
+        <div id="paste-section" style="display: none;">
+            <form method="POST">
+                <label for="items">Add items (comma or new line separated)</label>
+                <textarea id="items" name="items" placeholder="milk, eggs, bread"></textarea>
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="cart" value="{{ cart_field }}">
+                <input type="hidden" name="pending" value="{{ pending_field }}">
+                <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                <input type="hidden" name="filters" value="{{ filters_field }}">
+                <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+
+                <button type="submit">Add to list</button>
+            </form>
+        </div>
+
+        {% for warning in warnings %}
+            <div class="warning">{{ warning }}</div>
+        {% endfor %}
+
+        {% if grocery_list %}
+            <div class="cart-actions">
+                <form method="POST">
+                    <input type="hidden" name="action" value="buy_all">
+                    <input type="hidden" name="cart" value="{{ cart_field }}">
+                    <input type="hidden" name="pending" value="{{ pending_field }}">
+                    <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                    <input type="hidden" name="filters" value="{{ filters_field }}">
+                    <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                    <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+                    <button type="submit" class="btn-buy-all">Bought everything (uses cheapest stores)</button>
+                </form>
+                <form method="POST" class="clear-form">
+                    <input type="hidden" name="action" value="clear">
+                    <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                    <input type="hidden" name="filters" value="{{ filters_field }}">
+                    <button type="submit" class="btn-clear">Clear list</button>
+                </form>
+            </div>
+        {% endif %}
+
+        {% if pending %}
+            <hr class="divider">
+            <p class="section-title">Confirm these guesses</p>
+            {% for p in pending %}
+                <div class="guess-row">
+                    <span>Did you mean <strong>{{ p.guess }}</strong> for "{{ p.word }}"?</span>
+                    <div class="guess-buttons">
+                        <form method="POST">
+                            <input type="hidden" name="action" value="resolve">
+                            <input type="hidden" name="cart" value="{{ cart_field }}">
+                            <input type="hidden" name="pending" value="{{ pending_field }}">
+                            <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                            <input type="hidden" name="filters" value="{{ filters_field }}">
+                            <input type="hidden" name="resolve_word" value="{{ p.word }}">
+                            <input type="hidden" name="resolve_guess" value="{{ p.guess }}">
+                            <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                            <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+                            <button type="submit" name="resolve_decision" value="yes" class="btn-yes">✓</button>
+                        </form>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="resolve">
+                            <input type="hidden" name="cart" value="{{ cart_field }}">
+                            <input type="hidden" name="pending" value="{{ pending_field }}">
+                            <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                            <input type="hidden" name="filters" value="{{ filters_field }}">
+                            <input type="hidden" name="resolve_word" value="{{ p.word }}">
+                            <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                            <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+                            <button type="submit" name="resolve_decision" value="no" class="btn-no">✗</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if grocery_list %}
+            <hr class="divider">
+
+            <p class="section-title">Your list — mark each item bought or remove it</p>
+            {% for item in grocery_list %}
+                <div class="cart-item-row">
+                    <span class="cart-item-name">{{ item }}</span>
+                    <form method="POST" class="cart-item-form">
+                        <input type="hidden" name="action" value="buy_item">
+                        <input type="hidden" name="cart" value="{{ cart_field }}">
+                        <input type="hidden" name="pending" value="{{ pending_field }}">
+                        <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                        <input type="hidden" name="filters" value="{{ filters_field }}">
+                        <input type="hidden" name="item_name" value="{{ item }}">
+                        <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                        <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+                        {% if item_options.get(item) %}
+                            <select name="chosen_store" class="store-select">
+                                {% for store, info in item_options[item] %}
+                                    <option value="{{ store }}">{{ store }} — ${{ "%.2f"|format(info.price) }}
+                                        ({{ info.quantity|round(1) }}{{ unit_label(info.unit_type) }})
+                                        · ${{ "%.3f"|format(info.unit_price) }}/{{ unit_label(info.unit_type) }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn-bought">Bought</button>
+                        {% else %}
+                            <span class="not-carried">not found anywhere</span>
+                        {% endif %}
+                    </form>
+                    <form method="POST" class="cart-item-form">
+                        <input type="hidden" name="action" value="remove_item">
+                        <input type="hidden" name="cart" value="{{ cart_field }}">
+                        <input type="hidden" name="pending" value="{{ pending_field }}">
+                        <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                        <input type="hidden" name="filters" value="{{ filters_field }}">
+                        <input type="hidden" name="item_name" value="{{ item }}">
+                        <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                        <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+                        <button type="submit" class="btn-remove">Remove</button>
+                    </form>
+                </div>
+            {% endfor %}
+
+            <hr class="divider">
+
+            <p class="section-title">Cheapest single store</p>
+            {% for r in single_store_results %}
+                <div class="store-row">
+                    <span class="store-name">{{ r.store }}</span>
+                    <span>
+                        ${{ "%.2f"|format(r.total) }}
+                        {% if r.distance_miles is not none %}
+                            <span class="distance-tag">· {{ r.distance_miles }} mi</span>
+                        {% endif %}
+                    </span>
+                </div>
+                {% if r.items_missing %}
+                    <span class="missing-note">missing: {{ r.items_missing | join(', ') }}</span>
+                {% endif %}
+            {% endfor %}
+
+            <hr class="divider">
+
+            <p class="section-title">Recommended plan (best value by unit price, respects your filters)</p>
+            {% for item, info in plan.assignment.items() %}
+                <div class="item-row">
+                    <span>{{ item }}</span>
+                    <span class="item-store">
+                        ${{ "%.2f"|format(info.price) }} ({{ info.quantity|round(1) }}{{ unit_label(info.unit_type) }}) @ {{ info.store }}
+                        <span class="unit-price-tag">${{ "%.3f"|format(info.unit_price) }}/{{ unit_label(info.unit_type) }}</span>
+                    </span>
+                </div>
+            {% endfor %}
+            {% for item in plan.dropped_items %}
+                <div class="item-row">
+                    <span>{{ item }}</span>
+                    <span class="item-store">no store in range carries this</span>
+                </div>
+            {% endfor %}
+
+            <div class="split-total">
+                <span>Plan total</span>
+                <span>${{ "%.2f"|format(plan.total_cost) }}</span>
+            </div>
+
+            <p class="visits-note">Stops needed:</p>
+            {% for s in plan.stores_used %}
+                <div class="plan-stop-row">
+                    <span>{{ s.store }} — {{ s.item_count }} item{{ 's' if s.item_count != 1 }}, ${{ "%.2f"|format(s.total) }}
+                        {% if s.distance_miles is not none %}· {{ s.distance_miles }} mi{% endif %}
+                    </span>
+                    {% if not s.meets_minimums %}
+                        <span class="plan-necessity-note">kept out of necessity — below your minimums</span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% elif request.method == "POST" %}
+            <div class="empty">No items matched — try again.</div>
+        {% endif %}
+
+        {% endif %}
+
+        {% if view == "history" %}
+            <p class="section-title">Purchase history — what you've bought, and where</p>
+            {% if purchased %}
+                {% for p in purchased | reverse %}
+                    <div class="history-row">
+                        <span class="history-item">{{ p.item }}</span>
+                        <span class="history-details">${{ "%.2f"|format(p.price) }} @ {{ p.store }}</span>
+                        <span class="history-timestamp">{{ p.timestamp }}</span>
+                    </div>
+                {% endfor %}
+                <div class="split-total">
+                    <span>Total spent (this session)</span>
+                    <span>${{ "%.2f"|format(purchased | sum(attribute='price')) }}</span>
+                </div>
+            {% else %}
+                <div class="empty">Nothing bought yet — items you mark "Bought" will show up here.</div>
+            {% endif %}
+        {% endif %}
+
+        {% if view == "filters" %}
+            <p class="section-title">Filters — which stores are worth a stop</p>
+            <form method="POST">
+                <input type="hidden" name="action" value="save_filters">
+                <input type="hidden" name="cart" value="{{ cart_field }}">
+                <input type="hidden" name="pending" value="{{ pending_field }}">
+                <input type="hidden" name="purchased" value="{{ purchased_field }}">
+                <input type="hidden" name="user_lat" class="user-lat-field" value="{{ user_lat or '' }}">
+                <input type="hidden" name="user_lon" class="user-lon-field" value="{{ user_lon or '' }}">
+
+                <div class="filter-field">
+                    <label for="filter_max_distance">Max distance willing to drive (miles)</label>
+                    <input type="number" id="filter_max_distance" name="filter_max_distance"
+                           step="0.1" min="0"
+                           value="{{ filters.max_distance if filters.max_distance is not none else '' }}"
+                           placeholder="leave blank for no limit">
+                    <p class="filter-hint">Stores farther than this (straight-line) are left out entirely.</p>
+                </div>
+
+                <div class="filter-field">
+                    <label for="filter_min_spend">Minimum spend to make a store worth a stop ($)</label>
+                    <input type="number" id="filter_min_spend" name="filter_min_spend"
+                           step="0.01" min="0" value="{{ filters.min_spend }}">
+                    <p class="filter-hint">Default: $0 (off). Raise it if a $2 stop somewhere never feels worth it.</p>
+                </div>
+
+                <div class="filter-field">
+                    <label for="filter_min_items">Minimum items to make a store worth a stop</label>
+                    <input type="number" id="filter_min_items" name="filter_min_items"
+                           step="1" min="0" value="{{ filters.min_items }}">
+                    <p class="filter-hint">Default: 3. A store only enters the plan if it's picking up at least this many items — unless it's the only place carrying something you need.</p>
+                </div>
+
+                <button type="submit">Save filters</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <script>
+        const allItems = {{ all_items | tojson }};
+        const familyDefaults = {{ family_defaults | tojson }};
+        const itemFamilies = {{ item_families | tojson }};
+        const searchBox = document.getElementById('quick-search');
+        const resultsBox = document.getElementById('quick-results');
+        const quickAddForm = document.getElementById('quick-add-form');
+        const quickAddItems = document.getElementById('quick-add-items');
+
+        // Matches by the item's own name OR by its family — so typing a
+        // broad category word (e.g. "canned vegetables") surfaces every
+        // item in that family, even if none of their names literally
+        // contain that phrase.
+        function getMatches(filterText) {
+            if (!filterText) return allItems;
+            const lower = filterText.toLowerCase();
+            return allItems.filter(item =>
+                item.toLowerCase().includes(lower) ||
+                (itemFamilies[item] || '').toLowerCase().includes(lower)
+            );
+        }
+
+        function renderResults(filterText) {
+            const matches = getMatches(filterText);
+            resultsBox.innerHTML = '';
+
+            if (matches.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'quick-result-empty';
+                empty.textContent = "No exact matches — press Enter to try a spelling guess";
+                resultsBox.appendChild(empty);
+                return;
+            }
+
+            // The "default" badge is just a helpful hint about which size/
+            // variant is typical — it no longer gets silently auto-picked
+            // when there's more than one real option. You always click.
+            const defaultForTyped = familyDefaults[filterText.trim().toLowerCase()];
+
+            matches.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = 'quick-result-item';
+                if (defaultForTyped && item === defaultForTyped) row.classList.add('highlighted');
+                row.textContent = item;
+                if (defaultForTyped && item === defaultForTyped) {
+                    const badge = document.createElement('span');
+                    badge.className = 'default-badge';
+                    badge.textContent = 'default';
+                    row.appendChild(badge);
+                }
+                row.addEventListener('click', () => selectItem(item));
+                resultsBox.appendChild(row);
+            });
+        }
+
+        function selectItem(itemName) {
+            quickAddItems.value = itemName;
+            quickAddForm.submit();
+        }
+
+        searchBox.addEventListener('input', (e) => renderResults(e.target.value));
+
+        searchBox.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+
+            const typed = searchBox.value.trim();
+            if (!typed) return;
+
+            const matches = getMatches(typed);
+            if (matches.length === 1) {
+                // Exactly one real option — safe to add directly, no ambiguity.
+                selectItem(matches[0]);
+            } else if (matches.length > 1) {
+                // More than one genuine option (whether different sizes of the
+                // same thing, or entirely different products sharing a
+                // category) — don't guess. The list above is already showing
+                // all of them; click the one you meant.
+            } else {
+                // Nothing matched at all — hand the raw text to the server,
+                // which will try its typo-tolerant guess (same as the box below)
+                selectItem(typed);
+            }
+        });
+
+        // Show the full scrollable list right away, before any typing
+        renderResults('');
+
+        // Toggle between the Search box and the Paste-a-list box, so only
+        // one input mode is visible at a time.
+        const modeSearchBtn = document.getElementById('mode-search-btn');
+        const modePasteBtn = document.getElementById('mode-paste-btn');
+        const searchSection = document.getElementById('search-section');
+        const pasteSection = document.getElementById('paste-section');
+
+        if (modeSearchBtn && modePasteBtn) {
+            modeSearchBtn.addEventListener('click', () => {
+                searchSection.style.display = '';
+                pasteSection.style.display = 'none';
+                modeSearchBtn.classList.add('active');
+                modePasteBtn.classList.remove('active');
+            });
+            modePasteBtn.addEventListener('click', () => {
+                searchSection.style.display = 'none';
+                pasteSection.style.display = '';
+                modePasteBtn.classList.add('active');
+                modeSearchBtn.classList.remove('active');
+            });
+        }
+
+        // Ask the browser for the user's location once, on page load, and
+        // fill in every hidden lat/lon field on the page so whichever form
+        // gets submitted next (add, resolve, quick-add) carries it along.
+        const locationStatus = document.getElementById('location-status');
+
+        function fillLocationFields(lat, lon) {
+            document.querySelectorAll('.user-lat-field').forEach(el => el.value = lat);
+            document.querySelectorAll('.user-lon-field').forEach(el => el.value = lon);
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    fillLocationFields(position.coords.latitude, position.coords.longitude);
+                    locationStatus.textContent = "📍 Location found — showing distances";
+                },
+                (error) => {
+                    locationStatus.textContent = "📍 Location unavailable — distances hidden";
+                }
+            );
+        } else {
+            locationStatus.textContent = "📍 Location not supported by this browser";
+        }
+    </script>
+
+</body>
+</html>
