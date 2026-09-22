@@ -6,9 +6,26 @@ Core comparison logic (v1 scope):
 
 Missing items at a store are excluded from that store's total but flagged,
 since a store missing half your list shouldn't "win" on a technicality.
+
+Every price is stored per (item, store) as a package price + quantity, so
+comparing "cheapest" fairly means comparing UNIT price (price / quantity),
+not the raw package price -- a $2.31 half-gallon of milk and a $4.02
+gallon need to be compared per fl oz, not by their sticker price. Anywhere
+we're deciding which store is the "best" pick for an item, we compare by
+unit_price. Anywhere we're reporting what you'd actually pay, we use the
+real package price.
 """
 from db import get_connection
 from distance import haversine_distance_miles
+
+
+def unit_label(unit_type):
+    """Turns an internal unit code into a human-friendly display label."""
+    return {
+        "oz": "oz",
+        "fl_oz": "fl oz",
+        "count": "each",
+    }.get(unit_type, unit_type)
 
 
 def get_store_locations():
@@ -23,8 +40,14 @@ def get_store_locations():
 
 def get_prices_for_list(item_names):
     """
-    Returns a dict: {store_name: {item_name: price}} for every store that
-    carries at least one of the requested items.
+    Returns a dict: {store_name: {item_name: info}} for every store that
+    carries at least one of the requested items, where `info` is:
+        {
+            "price": <package price you pay>,
+            "quantity": <package size, e.g. 48>,
+            "unit_type": <"oz" / "fl_oz" / "count">,
+            "unit_price": price / quantity,
+        }
     """
     conn = get_connection()
     cur = conn.cursor()
@@ -32,7 +55,8 @@ def get_prices_for_list(item_names):
     placeholders = ",".join("?" for _ in item_names)
     cur.execute(
         f"""
-        SELECT s.name AS store_name, i.name AS item_name, p.price
+        SELECT s.name AS store_name, i.name AS item_name, i.unit_type AS unit_type,
+               p.price AS price, p.quantity AS quantity
         FROM prices p
         JOIN stores s ON s.id = p.store_id
         JOIN items i ON i.id = p.item_id
@@ -45,33 +69,44 @@ def get_prices_for_list(item_names):
 
     results = {}
     for row in rows:
-        results.setdefault(row["store_name"], {})[row["item_name"]] = row["price"]
+        price = row["price"]
+        quantity = row["quantity"] or 1
+        info = {
+            "price": price,
+            "quantity": quantity,
+            "unit_type": row["unit_type"],
+            "unit_price": price / quantity if quantity else price,
+        }
+        results.setdefault(row["store_name"], {})[row["item_name"]] = info
     return results
 
 
 def get_price_at_store(item_name, store_name):
-    """Returns the price of a single item at a single store, or None if not carried there."""
+    """Returns the price info dict for a single item at a single store, or None if not carried there."""
     data = get_prices_for_list([item_name])
     return data.get(store_name, {}).get(item_name)
 
 
 def get_stores_carrying_item(item_name):
-    """Returns [(store_name, price), ...] for every store that carries this item, cheapest first."""
+    """Returns [(store_name, info), ...] for every store that carries this item,
+    cheapest PER UNIT first -- info is the same dict shape as get_prices_for_list."""
     data = get_prices_for_list([item_name])
     options = [
         (store_name, prices[item_name])
         for store_name, prices in data.items()
         if item_name in prices
     ]
-    options.sort(key=lambda pair: pair[1])
+    options.sort(key=lambda pair: pair[1]["unit_price"])
     return options
 
 
 def cheapest_single_store(item_names, user_lat=None, user_lon=None, max_distance=None):
     """
-    Ranks stores by total cost for the FULL list. Stores missing items
-    are still shown, but flagged with what they're missing so an
-    incomplete-but-cheap total doesn't look misleadingly good.
+    Ranks stores by total cost for the FULL list -- actual dollars, i.e.
+    the sum of each item's real package price at that store (not unit
+    price; you're buying the whole package regardless of size). Stores
+    missing items are still shown, but flagged with what they're missing,
+    since a store missing half your list shouldn't "win" on a technicality.
 
     If user_lat/user_lon are given, adds a straight-line "distance_miles"
     to each result (None if that store has no coordinates on file).
@@ -90,11 +125,11 @@ def cheapest_single_store(item_names, user_lat=None, user_lon=None, max_distance
             distance = haversine_distance_miles(user_lat, user_lon, store_lat, store_lon)
 
         if max_distance is not None and distance is not None and distance > max_distance:
-            continue  # too far — leave it out of consideration entirely
+            continue  # too far -- leave it out of consideration entirely
 
         found_items = set(item_prices.keys())
         missing = [i for i in item_names if i not in found_items]
-        total = round(sum(item_prices.values()), 2)
+        total = round(sum(info["price"] for info in item_prices.values()), 2)
 
         results.append({
             "store": store_name,
@@ -108,17 +143,12 @@ def cheapest_single_store(item_names, user_lat=None, user_lon=None, max_distance
     results.sort(key=lambda r: (len(r["items_missing"]), r["total"]))
     return results
 
-def unit_label(unit):
-    """Turns an internal unit code into a human-friendly display label."""
-    return {
-        "oz": "oz",
-        "fl_oz": "fl oz",
-        "count": "each",
-    }.get(unit, unit)
 
 def cheapest_per_item(item_names):
     """
-    For each item, finds which store has the lowest price.
+    For each item, finds which store has the lowest UNIT price (fair
+    comparison across different package sizes), and reports the real
+    package price you'd actually pay there.
     Returns a dict: {item_name: {"store": ..., "price": ...}}
     plus the combined total if you split your shopping this way.
     """
@@ -126,13 +156,17 @@ def cheapest_per_item(item_names):
     best_per_item = {}
 
     for item in item_names:
-        best_store, best_price = None, None
+        best_store, best_info = None, None
         for store_name, item_prices in data.items():
             if item in item_prices:
-                if best_price is None or item_prices[item] < best_price:
-                    best_price = item_prices[item]
+                info = item_prices[item]
+                if best_info is None or info["unit_price"] < best_info["unit_price"]:
+                    best_info = info
                     best_store = store_name
-        best_per_item[item] = {"store": best_store, "price": best_price}
+        best_per_item[item] = {
+            "store": best_store,
+            "price": best_info["price"] if best_info else None,
+        }
 
     total = round(sum(
         v["price"] for v in best_per_item.values() if v["price"] is not None
@@ -156,16 +190,17 @@ def optimized_shopping_plan(item_names, user_lat=None, user_lon=None,
       - min_items: a store isn't "worth the stop" unless you're buying at
         least this many items there.
 
-    Starts from a plain cheapest-per-item assignment, then repeatedly
-    checks for any store that falls short of min_spend/min_items. If that
-    store's items ALL have another allowed store that also carries them,
-    the store gets dropped and its items reassigned to their next-best
-    option. If a store is the ONLY place that carries one of its assigned
-    items, it's kept anyway (flagged as "kept out of necessity") — you
-    can't buy an item nowhere just because a filter says so.
+    Starts from a per-item assignment based on lowest UNIT price (fair
+    across package sizes), then repeatedly checks for any store that
+    falls short of min_spend/min_items. If that store's items ALL have
+    another allowed store that also carries them, the store gets dropped
+    and its items reassigned to their next-best option. If a store is the
+    ONLY place that carries one of its assigned items, it's kept anyway
+    (flagged as "kept out of necessity") -- you can't buy an item nowhere
+    just because a filter says so.
 
     Returns a dict:
-      "assignment": {item: {"store":..., "price":...}} — final per-item pick
+      "assignment": {item: {"store":..., "price":...}} -- final per-item pick
       "dropped_items": items no allowed store carries at all
       "stores_used": [{"store", "item_count", "total", "distance_miles",
                         "meets_minimums"}, ...], sorted nearest-first
@@ -180,7 +215,7 @@ def optimized_shopping_plan(item_names, user_lat=None, user_lon=None,
             lat, lon = locations[store_name]
             store_distance[store_name] = haversine_distance_miles(user_lat, user_lon, lat, lon)
         else:
-            store_distance[store_name] = None  # unknown — don't penalize for it
+            store_distance[store_name] = None  # unknown -- don't penalize for it
 
     def distance_ok(store_name):
         if max_distance is None:
@@ -194,13 +229,13 @@ def optimized_shopping_plan(item_names, user_lat=None, user_lon=None,
         assignment = {}
         dropped = []
         for item in item_names:
-            best_store, best_price = None, None
+            best_store, best_info = None, None
             for store in allowed_set:
-                price = data.get(store, {}).get(item)
-                if price is not None and (best_price is None or price < best_price):
-                    best_store, best_price = store, price
+                info = data.get(store, {}).get(item)
+                if info is not None and (best_info is None or info["unit_price"] < best_info["unit_price"]):
+                    best_store, best_info = store, info
             if best_store:
-                assignment[item] = {"store": best_store, "price": best_price}
+                assignment[item] = {"store": best_store, "price": best_info["price"]}
             else:
                 dropped.append(item)
         return assignment, dropped
@@ -241,7 +276,7 @@ def optimized_shopping_plan(item_names, user_lat=None, user_lon=None,
                 break
 
         if droppable is None:
-            break  # every weak store is essential for at least one item — stop here
+            break  # every weak store is essential for at least one item -- stop here
 
         allowed.discard(droppable)
 
@@ -267,6 +302,10 @@ def optimized_shopping_plan(item_names, user_lat=None, user_lon=None,
         "stores_used": stores_used,
         "total_cost": total_cost,
     }
+
+
+def print_report(item_names, user_lat=None, user_lon=None):
+    """CLI debug helper -- prints both comparison views for a sample list."""
     print(f"\nGrocery list: {', '.join(item_names)}")
     print("=" * 50)
 
